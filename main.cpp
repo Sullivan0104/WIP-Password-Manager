@@ -3,10 +3,5 @@
 
 int main() 
 {
-    Vault vault;
-
-    vault.createSalt();
-    vault.deriveKey();
-    vault.verifyPassword();
     return 0;
 }
