@@ -2,7 +2,7 @@
 #include <sodium.h>
 #include <vector>
 #include <fstream>
-
+#include <cstring>
 /*______________________________________________________________________________
 Vault Class:
  - Setting the master password. 
@@ -48,6 +48,7 @@ struct Vault::Credential
     std::string site;
     std::string username;
     unsigned char* password {};
+    size_t passwordLength {};
 };
 
 /*______________________________________________________________________________
@@ -68,7 +69,7 @@ Vault::Vault()
     }
 }
 /*______________________________________________________________________________
-    - Erase salt, masterkey, and masterPassword and free their memory. 
+    - Erase sensitive data. 
 ______________________________________________________________________________*/
 Vault::~Vault() 
 {
@@ -94,6 +95,15 @@ Vault::~Vault()
         masterPassword = nullptr;
         masterPasswordLength = 0;
     }
+
+    for(auto&cred : credentials)
+    {
+        if(cred.password)
+        {
+            sodium_memzero(cred.password, cred.passwordLength);
+            sodium_free(cred.password);
+        }
+    }
 }
 /*______________________________________________________________________________
     - Generate a random salt.
@@ -116,14 +126,42 @@ void Vault::createSalt()
 ______________________________________________________________________________*/
 void Vault::getMasterPassword()
 {
+    std::vector<char> input(256); // limit input size (e.g. 256 chars max)
     std::cout << "Enter Master Password: ";
-    scanf("%s", masterPassword);
+    std::cin.getline(input.data(), input.size());
+
+    masterPasswordLength = strnlen(input.data(), input.size());
+    masterPassword = (unsigned char*)sodium_malloc(masterPasswordLength);
+
+    memcpy(masterPassword, input.data(), masterPasswordLength);
+
+    // Wipe temporary buffer
+    sodium_memzero(input.data(), input.size());
 }
 /*______________________________________________________________________________
     - Generate a argon2id key using masterPassword abnd salt
 ______________________________________________________________________________*/
 bool Vault::deriveKey()
-{
+{    
+    masterKeyLength = crypto_secretbox_KEYBYTES;
+    masterKey = (unsigned char*)sodium_malloc(masterKeyLength);
+    if (!masterKey)
+        return false;
+
+    // Argon2id parameters: opslimit, memlimit
+    const unsigned long long opslimit = crypto_pwhash_OPSLIMIT_INTERACTIVE;
+    const size_t memlimit = crypto_pwhash_MEMLIMIT_INTERACTIVE;
+
+    if (crypto_pwhash(masterKey, masterKeyLength,
+                      (const char*)masterPassword, masterPasswordLength,
+                      salt,
+                      opslimit, memlimit,
+                      crypto_pwhash_ALG_ARGON2ID13) != 0)
+    {
+        return false; // failed to derive key
+    }
+
+    return true;
     
 }
 /*______________________________________________________________________________
@@ -132,19 +170,71 @@ bool Vault::deriveKey()
 ______________________________________________________________________________*/
 void Vault::saveVault()
 {
+    std::ofstream ofs("vault.bin", std::ios::binary);
+    ofs.write((char*)salt, saltLength);
 
+    // TODO: Encrypt credentials with masterKey and write
+    ofs.close();
 }
 /*______________________________________________________________________________
     - OpenVault for reading. Must verifiy password first!
 ______________________________________________________________________________*/
 void Vault::loadVault()
 {
+    std::ifstream ifs("vault.bin", std::ios::binary);
+    if (!ifs) return;
 
+    ifs.read((char*)salt, saltLength);
+
+    // TODO: prompt for password -> deriveKey() -> decrypt credentials
+    ifs.close();
 }
 /*______________________________________________________________________________
     - Add creidentials to encrypted file
 ______________________________________________________________________________*/
 void Vault::addCredintials()
 {
+    Credential cred;
+    
+    std::cout << "Enter Credential (site, username, password): ";
+    std::string line;
+    std::getline(std::cin, line);
+
+    // Parse through input, seperate site, username, and password
+    size_t firstComma {line.find(',')};
+    size_t secondComma {line.find(',', firstComma + 1)};
+
+    if(firstComma == std::string::npos || secondComma == std::string::npos)
+    {
+        std::cerr << "Invalid Input Format!\n";
+    }
+
+    cred.site = line.substr(0, firstComma);
+    cred.username = line.substr(firstComma+1, secondComma-firstComma-1);
+
+    std::string passwordString = line.substr(secondComma + 1);
+
+    // Trim whitespace around fields 
+    auto trim = [](std::string& s) {
+        size_t start = s.find_first_not_of(" \t");
+        size_t end   = s.find_last_not_of(" \t");
+        if (start == std::string::npos) { s.clear(); return; }
+        s = s.substr(start, end - start + 1);
+    };
+    trim(cred.site);
+    trim(cred.username);
+    trim(passwordString);
+
+    // Copy password into secure memory
+    cred.passwordLength = passwordString.size();
+    cred.password = (unsigned char*)sodium_malloc(cred.passwordLength);
+
+    memcpy(cred.password, passwordString.data(), passwordString.size());
+    // Erase the string data
+    sodium_memzero(passwordString.data(), passwordString.size());
+
+    credentials.push_back(std::move(cred));
+
+    std::cout << "Credintials Successfully Added.\n";
     
 }
