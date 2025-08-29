@@ -1,3 +1,6 @@
+#ifndef VAULT_HPP
+#define VAULT_HPP
+
 #include <iostream>
 #include <sodium.h>
 #include <vector>
@@ -33,11 +36,12 @@ public:
     void createSalt();          // Creates a salt for hashing the password
     bool deriveKey();           // Create key for accessing file. 
     void getMasterPassword();  // Get user created Master Password
-    void verifyPassword();      // Verifies masterPoassword when entered by user
+    bool verifyPassword();      // Verifies masterPoassword when entered by user
     void loadVault();           // Loads the encypted file
     void saveVault();           // Save added contents to vault.
-    void addCredintials();      // stores credintials to encrypted file. 
+    void addCredentials();      // stores credintials to encrypted file. 
 
+    const std::vector<Credential>& getCredentials() const {return credentials;}
 };
 
 /*______________________________________________________________________________
@@ -68,6 +72,7 @@ Vault::Vault()
         throw std::runtime_error("Failed to allocate secure memory for salt.");
     }
 }
+
 /*______________________________________________________________________________
     - Erase sensitive data. 
 ______________________________________________________________________________*/
@@ -105,22 +110,47 @@ Vault::~Vault()
         }
     }
 }
+
 /*______________________________________________________________________________
-    - Generate a random salt.
+    - Generate a random salt. Will check if salt already exist in vaule file. 
 ______________________________________________________________________________*/
 void Vault::createSalt()
 {
-    randombytes_buf(salt, saltLength);
+    std::ifstream ifs("vault.bin", std::ios::binary);
+    if (ifs.is_open()) {
+        ifs.read((char*)salt, saltLength);
+    } else {
+        // Generate a new salt
+        randombytes_buf(salt, saltLength);
 
-    /*TESTING*/
-    std::cout << "Salt (hex): ";
-    for(size_t i {0}; i < saltLength; ++i)
-    {
-        printf("%02x", salt[i]);
+        // Get a master password from user and derive a key
+        getMasterPassword();
+        if (!deriveKey()) {
+            throw std::runtime_error("Failed to derive key.");
+        }
+
+        // Prepare known marker
+        const char* marker = "VAULT";
+        size_t markerLen = strlen(marker);
+
+        unsigned char nonce[crypto_secretbox_NONCEBYTES];
+        randombytes_buf(nonce, sizeof nonce);
+
+        std::vector<unsigned char> cipher(markerLen + crypto_secretbox_MACBYTES);
+
+        crypto_secretbox_easy(cipher.data(),
+                              (const unsigned char*)marker, markerLen,
+                              nonce, masterKey);
+
+        // Save salt, nonce, and marker ciphertext to file
+        std::ofstream ofs("vault.bin", std::ios::binary);
+        ofs.write((char*)salt, saltLength);
+        ofs.write((char*)nonce, sizeof nonce);
+        ofs.write((char*)cipher.data(), cipher.size());
+        ofs.close();
     }
-    std::cout << "\n";
-
 }
+
 /*______________________________________________________________________________
     - Get masterPassword from user
 ______________________________________________________________________________*/
@@ -138,6 +168,7 @@ void Vault::getMasterPassword()
     // Wipe temporary buffer
     sodium_memzero(input.data(), input.size());
 }
+
 /*______________________________________________________________________________
     - Generate a argon2id key using masterPassword abnd salt
 ______________________________________________________________________________*/
@@ -158,83 +189,198 @@ bool Vault::deriveKey()
                       opslimit, memlimit,
                       crypto_pwhash_ALG_ARGON2ID13) != 0)
     {
-        return false; // failed to derive key
+        return false; 
     }
 
     return true;
     
 }
+
+/*______________________________________________________________________________
+    - Verfy Password
+______________________________________________________________________________*/
+bool  Vault::verifyPassword()
+{
+    // Load salt + marker from file
+    std::ifstream ifs("vault.bin", std::ios::binary);
+    if (!ifs) {
+        std::cerr << "Vault file not found.\n";
+        return false;
+    }
+
+    ifs.read((char*)salt, saltLength);
+
+    unsigned char nonce[crypto_secretbox_NONCEBYTES];
+    ifs.read((char*)nonce, sizeof nonce);
+
+    // Read marker ciphertext (length is known: strlen("VAULT") + MACBYTES)
+    size_t cipherLen = strlen("VAULT") + crypto_secretbox_MACBYTES;
+    std::vector<unsigned char> cipher(cipherLen);
+    ifs.read((char*)cipher.data(), cipherLen);
+
+    ifs.close();
+
+    // Ask user for password, derive key
+    getMasterPassword();
+    if (!deriveKey()) {
+        std::cerr << "Key derivation failed.\n";
+        return false;
+    }
+
+    // Attempt to decrypt marker
+    std::vector<unsigned char> decrypted(strlen("VAULT"));
+    if (crypto_secretbox_open_easy(decrypted.data(),
+                                   cipher.data(), cipher.size(),
+                                   nonce, masterKey) != 0) {
+        std::cerr << "Wrong master password!\n";
+        return false;
+    }
+
+    std::cout << "Password verified successfully.\n";
+    return true;
+}
+
 /*______________________________________________________________________________
     - Save salt to file for later masterPassword verification
     - May save credintials added to encypted file here as well in future
 ______________________________________________________________________________*/
 void Vault::saveVault()
 {
-    std::ofstream ofs("vault.bin", std::ios::binary);
-    ofs.write((char*)salt, saltLength);
+    std::fstream ofs("vault.bin", std::ios::binary | std::ios::in | std::ios::out);
+    if (!ofs) {
+        throw std::runtime_error("Vault file not found.");
+    }
 
-    // TODO: Encrypt credentials with masterKey and write
+    // Move past the header: salt + marker nonce + marker cipher
+    size_t headerSize = saltLength + crypto_secretbox_NONCEBYTES + strlen("VAULT") + crypto_secretbox_MACBYTES;
+    ofs.seekp(headerSize, std::ios::beg);
+
+    // Now write credentials
+    for (auto& cred : credentials) {
+        // Write site
+        uint32_t siteLen = cred.site.size();
+        ofs.write((char*)&siteLen, sizeof siteLen);
+        ofs.write(cred.site.data(), siteLen);
+
+        // Write username
+        uint32_t userLen = cred.username.size();
+        ofs.write((char*)&userLen, sizeof userLen);
+        ofs.write(cred.username.data(), userLen);
+
+        // Encrypt password
+        unsigned char pwNonce[crypto_secretbox_NONCEBYTES];
+        randombytes_buf(pwNonce, sizeof pwNonce);
+
+        std::vector<unsigned char> pwCipher(cred.passwordLength + crypto_secretbox_MACBYTES);
+        crypto_secretbox_easy(pwCipher.data(),
+                              cred.password, cred.passwordLength,
+                              pwNonce, masterKey);
+
+        // Write nonce + ciphertext length + ciphertext
+        ofs.write((char*)pwNonce, sizeof pwNonce);
+
+        uint32_t cipherLen = pwCipher.size();
+        ofs.write((char*)&cipherLen, sizeof cipherLen);
+        ofs.write((char*)pwCipher.data(), cipherLen);
+    }
+
     ofs.close();
 }
+
+
 /*______________________________________________________________________________
     - OpenVault for reading. Must verifiy password first!
 ______________________________________________________________________________*/
 void Vault::loadVault()
 {
     std::ifstream ifs("vault.bin", std::ios::binary);
-    if (!ifs) return;
+    if (!ifs) {
+        std::cerr << "No vault found.\n";
+        return;
+    }
 
+    // Read salt
     ifs.read((char*)salt, saltLength);
 
-    // TODO: prompt for password -> deriveKey() -> decrypt credentials
-    ifs.close();
+    // Read marker nonce + ciphertext
+    unsigned char nonce[crypto_secretbox_NONCEBYTES];
+    ifs.read((char*)nonce, sizeof nonce);
+
+    size_t markerLen = strlen("VAULT") + crypto_secretbox_MACBYTES;
+    std::vector<unsigned char> markerCipher(markerLen);
+    ifs.read((char*)markerCipher.data(), markerLen);
+
+    // Verify password (deriveKey already called before loadVault)
+    std::vector<unsigned char> decrypted(strlen("VAULT"));
+    if (crypto_secretbox_open_easy(decrypted.data(),
+                                   markerCipher.data(), markerCipher.size(),
+                                   nonce, masterKey) != 0) {
+        std::cerr << "Wrong master password.\n";
+        return;
+    }
+
+    // Read credentials until EOF
+    credentials.clear();
+    while (ifs.peek() != EOF) {
+        Credential cred;
+
+        uint32_t siteLen, userLen, cipherLen;
+
+        ifs.read((char*)&siteLen, sizeof siteLen);
+        if (ifs.eof()) break;
+        cred.site.resize(siteLen);
+        ifs.read(&cred.site[0], siteLen);
+
+        ifs.read((char*)&userLen, sizeof userLen);
+        cred.username.resize(userLen);
+        ifs.read(&cred.username[0], userLen);
+
+        unsigned char pwNonce[crypto_secretbox_NONCEBYTES];
+        ifs.read((char*)pwNonce, sizeof pwNonce);
+
+        ifs.read((char*)&cipherLen, sizeof cipherLen);
+        std::vector<unsigned char> pwCipher(cipherLen);
+        ifs.read((char*)pwCipher.data(), cipherLen);
+
+        // Decrypt password
+        cred.passwordLength = cipherLen - crypto_secretbox_MACBYTES;
+        cred.password = (unsigned char*)sodium_malloc(cred.passwordLength);
+        if (crypto_secretbox_open_easy(cred.password,
+                                       pwCipher.data(), pwCipher.size(),
+                                       pwNonce, masterKey) != 0) {
+            std::cerr << "Decryption failed for a credential.\n";
+            sodium_free(cred.password);
+            continue;
+        }
+
+        credentials.push_back(std::move(cred));
+    }
 }
 /*______________________________________________________________________________
     - Add creidentials to encrypted file
 ______________________________________________________________________________*/
-void Vault::addCredintials()
+void Vault::addCredentials()
 {
     Credential cred;
-    
-    std::cout << "Enter Credential (site, username, password): ";
-    std::string line;
-    std::getline(std::cin, line);
 
-    // Parse through input, seperate site, username, and password
-    size_t firstComma {line.find(',')};
-    size_t secondComma {line.find(',', firstComma + 1)};
+    std::cout << "Site: ";
+    std::getline(std::cin, cred.site);
 
-    if(firstComma == std::string::npos || secondComma == std::string::npos)
-    {
-        std::cerr << "Invalid Input Format!\n";
-    }
+    std::cout << "Username: ";
+    std::getline(std::cin, cred.username);
 
-    cred.site = line.substr(0, firstComma);
-    cred.username = line.substr(firstComma+1, secondComma-firstComma-1);
-
-    std::string passwordString = line.substr(secondComma + 1);
-
-    // Trim whitespace around fields 
-    auto trim = [](std::string& s) {
-        size_t start = s.find_first_not_of(" \t");
-        size_t end   = s.find_last_not_of(" \t");
-        if (start == std::string::npos) { s.clear(); return; }
-        s = s.substr(start, end - start + 1);
-    };
-    trim(cred.site);
-    trim(cred.username);
-    trim(passwordString);
-
-    // Copy password into secure memory
-    cred.passwordLength = passwordString.size();
+    std::cout << "Password: ";
+    std::string pw;
+    std::getline(std::cin, pw);
+    cred.passwordLength = pw.size();
     cred.password = (unsigned char*)sodium_malloc(cred.passwordLength);
-
-    memcpy(cred.password, passwordString.data(), passwordString.size());
-    // Erase the string data
-    sodium_memzero(passwordString.data(), passwordString.size());
+    memcpy(cred.password, pw.data(), cred.passwordLength);
+    sodium_memzero(pw.data(), pw.size());
 
     credentials.push_back(std::move(cred));
 
     std::cout << "Credintials Successfully Added.\n";
     
 }
+
+#endif // VAULT_HPP
