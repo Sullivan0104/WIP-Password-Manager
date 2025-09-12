@@ -27,13 +27,13 @@ ________________________________________________________________________
     )";
 
     Display disp;
-    disp.show(vault);   // optional – shows the table each time
+    disp.show(vault);  
 
     std::cout << "\n--- Menu -------------------------------------------------\n"
               << "1) Show all stored credentials\n"
               << "2) Add a new credential\n"
               << "3) Quit (save & exit)\n"
-              << "Choose an option [1‑3]: " << std::flush;
+              << "Choose an option [1-3]: " << std::flush;
 }
 
 int main()
@@ -50,33 +50,32 @@ int main()
 
     bool running = true;
     while (running) {
-        refreshUI(vault);                     // <-- draw fresh UI
+        refreshUI(vault);                 
 
         int choice = 0;
         std::cin >> choice;
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
         switch (choice) {
-            case 1: {                         // Show (already done by refreshUI)
-                // Nothing else needed – the table is already printed.
+            case 1: {                        
+
                 break;
             }
-            case 2: {                         // Add a credential
-                vault.addCredentials();       // <-- mutates vault
-                // Optionally autosave here:
-                // vault.saveVault();
+            case 2: {                       
+                vault.addCredentials();   
+
                 break;
             }
-            case 3: {                         // Quit
+            case 3: {                         
                 running = false;
                 break;
             }
             default:
-                std::cout << "Invalid selection – please type 1, 2 or 3.\n";
+                std::cout << "Invalid selection - please type 1, 2 or 3.\n";
         }
     }
 
-    vault.saveVault();                       // final persist
-    std::cout << "Good‑bye!\n";
+    vault.saveVault();                     
+    std::cout << "Goodbye!\n";
     return 0;
 }
