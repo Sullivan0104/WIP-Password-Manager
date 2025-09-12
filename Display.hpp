@@ -21,16 +21,16 @@ public:
         }
 
         std::cout << "\nStored Credentials:\n";
-        std::cout << "--------------------------------\n";
+        std::cout << "________________________________________\n";
 
         for (const auto& cred : creds) {
-            std::cout << "Site: " << cred.site << "\n";
+            std::cout << "Site    : " << cred.site << "\n";
             std::cout << "Username: " << cred.username << "\n";
 
             // Convert password to string for display
             std::string pw(reinterpret_cast<const char*>(cred.password), cred.passwordLength);
             std::cout << "Password: " << pw << "\n";
-            std::cout << "--------------------------------\n";
+            std::cout << "________________________________________\n";
         }
     }
 };
