@@ -1,4 +1,5 @@
 # WIP-Password-Manager
+Lightweight password vault written in C++. Derives the key from a master-password using argon2id, then stores ever credential in a single encrypted binary file. Simple CML menu is used for the User to view and add credentials. All sensitive data kept in sodium‑locked memory that is securely wiped on exit. 
 # Goal: 
 Complete a practical C++ Password manager utilizing OOP and efficent and secure memory management.
 # Current Features
