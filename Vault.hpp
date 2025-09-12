@@ -6,6 +6,9 @@
 #include <vector>
 #include <fstream>
 #include <cstring>
+#include <termios.h>
+#include <unistd.h>
+
 /*______________________________________________________________________________
 Vault Class:
  - Setting the master password. 
@@ -35,7 +38,7 @@ public:
 
     void createSalt();          // Creates a salt for hashing the password
     bool deriveKey();           // Create key for accessing file. 
-    void getMasterPassword();  // Get user created Master Password
+    void getMasterPassword();   // Get user created Master Password
     bool verifyPassword();      // Verifies masterPoassword when entered by user
     void loadVault();           // Loads the encypted file
     void saveVault();           // Save added contents to vault.
@@ -156,9 +159,27 @@ void Vault::createSalt()
 ______________________________________________________________________________*/
 void Vault::getMasterPassword()
 {
+    termios oldt{}, newt{};
+    if(tcgetattr(STDIN_FILENO, &oldt) == -1)
+    {
+        throw std::runtime_error("tcgetattr failed");
+    }
+    newt = oldt;
+    newt.c_lflag &= ~ECHO;
+    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &newt) == -1)
+    {
+        throw std::runtime_error("tcsetattr failed");
+    }
+
     std::vector<char> input(256); // limit input size (e.g. 256 chars max)
     std::cout << "Enter Master Password: ";
     std::cin.getline(input.data(), input.size());
+
+    if (tcsetattr(STDERR_FILENO, TCSAFLUSH, &oldt) == -1)
+    {
+        std::cerr << "/nWarning: failed to restore terminal settings.\n";
+    }
+    std::cout << '\n';
 
     masterPasswordLength = strnlen(input.data(), input.size());
     masterPassword = (unsigned char*)sodium_malloc(masterPasswordLength);
@@ -180,8 +201,8 @@ bool Vault::deriveKey()
         return false;
 
     // Argon2id parameters: opslimit, memlimit
-    const unsigned long long opslimit = crypto_pwhash_OPSLIMIT_INTERACTIVE;
-    const size_t memlimit = crypto_pwhash_MEMLIMIT_INTERACTIVE;
+    const unsigned long long opslimit = crypto_pwhash_OPSLIMIT_MODERATE;
+    const size_t memlimit = crypto_pwhash_MEMLIMIT_SENSITIVE;
 
     if (crypto_pwhash(masterKey, masterKeyLength,
                       (const char*)masterPassword, masterPasswordLength,
