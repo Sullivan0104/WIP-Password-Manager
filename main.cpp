@@ -11,7 +11,6 @@
 #endif
 inline void clearScreen() { std::system(CLEAR_CMD); }
 
-// ---------- UI refresh ----------
 void refreshUI(Vault& vault)
 {
     clearScreen();
@@ -29,7 +28,7 @@ ________________________________________________________________________
     Display disp;
     disp.show(vault);  
 
-    std::cout << "\n--- Menu -------------------------------------------------\n"
+    std::cout << "\n______________ Menu _______________ \n"
               << "1) Show all stored credentials\n"
               << "2) Add a new credential\n"
               << "3) Quit (save & exit)\n"
