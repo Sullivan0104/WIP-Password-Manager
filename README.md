@@ -12,6 +12,8 @@ Complete a practical C++ Password manager utilizing OOP and efficent and secure 
 # Planned Features
 | Features  
 | ------------- |
-|Hide charcters for passwords as asterisks(*), until the user decides to unhide them.|
-|Delete individual credientials.|
-|More polished UI.|
+||
+||
+||
+||
+||
