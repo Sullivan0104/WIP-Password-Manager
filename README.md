@@ -10,7 +10,7 @@ Complete a practical C++ Password manager utilizing OOP and efficent and secure 
 |     Zero‑Access Memory| Sensitive material lives in memory that is locked and wiped as soon as it’s no longer needed.|
 <img width="951" height="707" alt="ExampleVault" src="https://github.com/user-attachments/assets/d3922494-9a7f-4836-8172-aa7b01885f84" />
 # Planned Features
-| Features  
+| Features |
 | ------------- |
 ||
 ||
