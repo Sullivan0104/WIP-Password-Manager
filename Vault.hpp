@@ -8,6 +8,9 @@
 #include <cstring>
 #include <termios.h>
 #include <unistd.h>
+#include <algorithm>
+#include <thread>
+#include <chrono>
 
 /*______________________________________________________________________________
 Vault Class:
@@ -42,7 +45,8 @@ public:
     bool verifyPassword();      // Verifies masterPoassword when entered by user
     void loadVault();           // Loads the encypted file
     void saveVault();           // Save added contents to vault.
-    void addCredentials();      // stores credintials to encrypted file. 
+    void addCredentials();      // stores credintials to encrypted file.
+    void deleteCredential();    // Delete a credintial in the encrypted file. 
 
     const std::vector<Credential>& getCredentials() const {return credentials;}
 };
@@ -402,6 +406,70 @@ void Vault::addCredentials()
 
     std::cout << "Credintials Successfully Added.\n";
     
+}
+/*______________________________________________________________________________
+    - Delete a credential from the vault.
+    - User provides site/username to identify which one to delete.
+______________________________________________________________________________*/
+void Vault::deleteCredential()
+{
+    if (credentials.empty()) {
+        std::cout << "No credentials available to delete.\n";
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+        return;
+    }
+
+    std::string siteInput, userInput;
+    std::cout << "Enter Site of credential to delete: ";
+    std::getline(std::cin, siteInput);
+
+    std::cout << "Enter Username of credential to delete: ";
+    std::getline(std::cin, userInput);
+
+    std::cout << "Are you sure you want to delete this credential: \n";
+    std::cout << "Website: "<< siteInput << '\n';
+    std::cout << "Username: " << userInput << '\n';
+    std::string verification;
+    std::cout << "[Yes/No]: ";
+    std::getline(std::cin, verification);
+    
+    if(verification == "No" || verification == "no")
+    {
+        return;
+    }
+    else if(verification == "Yes" || verification == "yes")
+    {
+            
+    }
+    else
+    {
+        std::cout << "Invalid Input. Deletion cancelled.\n";
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+
+    auto it = std::find_if(credentials.begin(), credentials.end(),
+        [&](const Credential& cred) {
+            return cred.site == siteInput && cred.username == userInput;
+        });
+
+    if (it == credentials.end()) {
+        std::cout << "No matching credential found.\n";
+        std::this_thread::sleep_for(std::chrono::seconds(3));
+        return;
+    }
+
+    if (it->password) {
+        sodium_memzero(it->password, it->passwordLength);
+        sodium_free(it->password);
+        it->password = nullptr;
+        it->passwordLength = 0;
+    }
+
+    credentials.erase(it);
+
+    saveVault();
+
+    std::cout << "Credential deleted successfully.\n";
 }
 
 #endif // VAULT_HPP

@@ -32,7 +32,8 @@ ________________________________________________________________________
               << "1) Show all stored credentials\n"
               << "2) Add a new credential\n"
               << "3) Quit (save & exit)\n"
-              << "Choose an option [1-3]: " << std::flush;
+              << "4) Delete credential\n"
+              << "Choose an option [1-4]: " << std::flush;
 }
 
 int main()
@@ -57,16 +58,18 @@ int main()
 
         switch (choice) {
             case 1: {                        
-
                 break;
             }
             case 2: {                       
                 vault.addCredentials();   
-
                 break;
             }
             case 3: {                         
                 running = false;
+                break;
+            }
+            case 4: {
+                vault.deleteCredential();
                 break;
             }
             default:
