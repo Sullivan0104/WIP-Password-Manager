@@ -16,6 +16,7 @@
 Vault Class:
  - Setting the master password. 
  - Salting and hashing passwords. 
+ - Adding, and deleting credentials.
  - Storing credintials in a encypted file.
  - Verifying the master password
 ______________________________________________________________________________*/
