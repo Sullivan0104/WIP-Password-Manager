@@ -31,14 +31,18 @@ int main()
 
         switch (choice) {
             case 1: {
-                vault.addCredentials();
+                disp.togglePasswordVisibility();
                 break;
             }
             case 2: {
-                running = false;
+                vault.addCredentials();
                 break;
             }
             case 3: {
+                running = false;
+                break;
+            }
+            case 4: {
                 vault.deleteCredential();
                 break;
             }

@@ -446,6 +446,7 @@ void Vault::deleteCredential()
     {
         std::cout << "Invalid Input. Deletion cancelled.\n";
         std::this_thread::sleep_for(std::chrono::seconds(1));
+        return;
     }
 
     auto it = std::find_if(credentials.begin(), credentials.end(),

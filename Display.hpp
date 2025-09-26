@@ -23,9 +23,17 @@ inline void clearScreen() {
 
 class Display
 {
+private:
+    bool showPasswords = false;
+
 public:
     Display() = default;
     ~Display() = default;
+
+    void togglePasswordVisibility()
+    {
+        showPasswords = !showPasswords;
+    }
 
     void show(const Vault& vault) {
         const auto& creds = vault.getCredentials();
@@ -42,8 +50,14 @@ public:
             std::cout << "Site    : " << cred.site << "\n";
             std::cout << "Username: " << cred.username << "\n";
 
-            std::string pw(reinterpret_cast<const char*>(cred.password), cred.passwordLength);
-            std::cout << "Password: " << pw << "\n";
+            if (showPasswords) {
+                // Plain text
+                std::string pw(reinterpret_cast<const char*>(cred.password), cred.passwordLength);
+                std::cout << "Password: " << pw << "\n";
+            } else {
+                // Masked with '*'
+                std::cout << "Password: " << std::string(cred.passwordLength, '*') << "\n";
+            }
             std::cout << "________________________________________\n";
         }
     }
@@ -64,10 +78,11 @@ ________________________________________________________________________
         show(vault);
 
         std::cout << "\n______________ Menu _______________ \n"
-                  << "1) Add a new credential\n"
-                  << "2) Quit (save & exit)\n"
-                  << "3) Delete credential\n"
-                  << "Choose an option [1-3]: " << std::flush;
+                  << "1) Toggle Password visibility\n"
+                  << "2) Add a new credential\n"
+                  << "3) Quit (save & exit)\n"
+                  << "4) Delete credential\n"
+                  << "Choose an option [1-4]: " << std::flush;
     }
 };
 
