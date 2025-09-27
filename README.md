@@ -3,7 +3,7 @@ Lightweight password vault written in C++. Derives the key from a master-passwor
 # Goal: 
 Complete a practical C++ Password manager utilizing OOP and efficent and secure memory management.
 # Note:
-Previous commit history is under the backup main branch.
+Previous commit history is under the archive/main branch.
 # Current Features
 | Feauture | Description |
 |-----:|-----------|
