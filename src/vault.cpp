@@ -328,12 +328,37 @@ void Vault::addCredentials()
     std::getline(std::cin, cred.username);
 
     std::cout << "Password: ";
-    std::string pw;
-    std::getline(std::cin, pw);
-    cred.passwordLength = pw.size();
-    cred.password = (unsigned char*)sodium_malloc(cred.passwordLength);
-    memcpy(cred.password, pw.data(), cred.passwordLength);
-    sodium_memzero(pw.data(), pw.size());
+    const size_t MAX_PASSWORD_LEN = 1024;
+    unsigned char* pwBuffer = (unsigned char*)sodium_malloc(MAX_PASSWORD_LEN);
+    size_t length = 0;
+    char ch;
+
+    while (std::cin.get(ch) && ch != '\n' && length < MAX_PASSWORD_LEN)
+    {
+        pwBuffer[length++] = static_cast<unsigned char>(ch);
+    }
+    
+    if (length == 0)
+    {
+        sodium_free(pwBuffer);
+        std::cout << "Empty passwords are invalid.\n";
+        return;
+    }
+
+    cred.passwordLength = length;
+    cred.password = (unsigned char*)sodium_malloc(length);
+
+    if(!cred.password)
+    {
+        sodium_memzero(pwBuffer, length);
+        sodium_free(pwBuffer);
+        throw std::runtime_error("Secure memory allocation failed.");
+    }
+    
+    memcpy(cred.password, pwBuffer, length);
+
+    sodium_memzero(pwBuffer, length);
+    sodium_free(pwBuffer);
 
     credentials.push_back(std::move(cred));
 
