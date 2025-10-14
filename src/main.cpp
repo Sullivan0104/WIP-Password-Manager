@@ -13,7 +13,7 @@ int main()
 {
     Vault vault;
 
-    vault.createSalt();
+    vault.initVault();
     if (!vault.verifyPassword()) {
         std::cerr << "SENDING DRONES TO TERMINATE YOU!\n";
         return 1;

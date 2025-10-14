@@ -10,11 +10,7 @@ Display class:
 - Displays the UI.
 ______________________________________________________________________________*/
 
-#ifdef _WIN32
-    constexpr const char* CLEAR_CMD = "cls";
-#else
-    constexpr const char* CLEAR_CMD = "clear";
-#endif
+constexpr const char* CLEAR_CMD = "clear";
 
 inline void clearScreen();
 

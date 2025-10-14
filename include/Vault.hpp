@@ -43,7 +43,7 @@ public:
     Vault();
     ~Vault();
 
-    void createSalt();          // Creates a salt for hashing the password
+    void initVault();          // Creates a salt for hashing the password
     bool deriveKey();           // Create key for accessing file. 
     void getMasterPassword();   // Get user created Master Password
     bool verifyPassword();      // Verifies masterPoassword when entered by user

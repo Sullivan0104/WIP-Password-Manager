@@ -69,9 +69,9 @@ Vault::~Vault()
 }
 
 /*______________________________________________________________________________
-    - Generate a random salt. Will check if salt already exist in vaule file. 
+    - Generates vault file 
 ______________________________________________________________________________*/
-void Vault::createSalt()
+void Vault::initVault()
 {
     std::ifstream ifs("vault.bin", std::ios::binary);
     if (ifs.is_open()) {
